@@ -18,11 +18,26 @@ async function updateTime() {
   if (currentDomain && startTime > 0) {
     const timeSpent = Date.now() - startTime;
     
+    // --- 日付リセット処理の追加 ---
+    const today = new Date().toDateString(); // 今日の日付文字列を取得
+    const { lastDate } = await chrome.storage.local.get(["lastDate"]);
+    
+    if (lastDate !== today) {
+      // 日付が変わっていればストレージを一旦すべてクリアする
+      await chrome.storage.local.clear();
+    }
+    // ----------------------------
+
     // localストレージに累計時間を保存
     const result = await chrome.storage.local.get([currentDomain]);
     let totalTime = result[currentDomain] || 0;
     totalTime += timeSpent;
-    await chrome.storage.local.set({ [currentDomain]: totalTime });
+    
+    // 更新した時間と一緒に、今日の日付(lastDate)も保存しておく
+    await chrome.storage.local.set({ 
+      [currentDomain]: totalTime,
+      lastDate: today
+    });
   }
 }
 
