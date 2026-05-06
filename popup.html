@@ -3,15 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <style>
-    body { width: 300px; padding: 10px; font-family: sans-serif; }
-    h2 { font-size: 16px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
-    ul { list-style: none; padding: 0; }
-    li { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    body { width: 320px; padding: 10px; font-family: sans-serif; }
+    /* 日付の見出しデザイン */
+    h2 { font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-top: 15px; }
+    h2:first-child { margin-top: 0; }
+    ul { list-style: none; padding: 0; margin: 0 0 10px 0; }
+    li { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;}
+    .no-data { color: #888; font-size: 13px; justify-content: center; }
   </style>
 </head>
 <body>
-  <h2>今日の閲覧時間</h2>
-  <ul id="timeList"></ul>
+  <!-- JavaScriptからここに履歴を流し込みます -->
+  <div id="container"></div>
   <script src="popup.js"></script>
 </body>
 </html>
