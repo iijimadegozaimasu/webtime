@@ -1,3 +1,9 @@
+// 日付を YYYY-MM-DD 形式で取得する関数
+function getTodayString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // URLからドメイン名を抽出する関数
 function getDomain(url) {
   try {
@@ -10,49 +16,50 @@ function getDomain(url) {
 
 // 閲覧時間を計算して保存する関数
 async function updateTime() {
-  // sessionストレージから現在の状態を取得（スリープ対策）
   const data = await chrome.storage.session.get(["currentDomain", "startTime"]);
   const currentDomain = data.currentDomain;
   const startTime = data.startTime;
 
   if (currentDomain && startTime > 0) {
     const timeSpent = Date.now() - startTime;
+    const today = getTodayString();
     
-    // --- 日付リセット処理の追加 ---
-    const today = new Date().toDateString(); // 今日の日付文字列を取得
-    const { lastDate } = await chrome.storage.local.get(["lastDate"]);
+    // 現在保存されている全データを取得
+    const result = await chrome.storage.local.get(null);
     
-    if (lastDate !== today) {
-      // 日付が変わっていればストレージを一旦すべてクリアする
-      await chrome.storage.local.clear();
-    }
-    // ----------------------------
+    // 今日のデータを取得（まだ無ければ空のオブジェクトを作成）
+    let todayData = result[today] || {};
+    // ドメインの時間を加算
+    todayData[currentDomain] = (todayData[currentDomain] || 0) + timeSpent;
+    
+    // 今日のデータを保存
+    await chrome.storage.local.set({ [today]: todayData });
 
-    // localストレージに累計時間を保存
-    const result = await chrome.storage.local.get([currentDomain]);
-    let totalTime = result[currentDomain] || 0;
-    totalTime += timeSpent;
-    
-    // 更新した時間と一緒に、今日の日付(lastDate)も保存しておく
-    await chrome.storage.local.set({ 
-      [currentDomain]: totalTime,
-      lastDate: today
-    });
+    // --- 過去3日分だけを残す（古いデータを削除する）処理 ---
+    // 保存されているキーの中から「YYYY-MM-DD」形式のものだけを取り出して古い順に並べる
+    const dates = Object.keys(result)
+      .filter(key => key.match(/^\d{4}-\d{2}-\d{2}$/))
+      .sort(); 
+      
+    // 今日を含めて3日分（今日、1日前、2日前）を超えたら一番古いものを削除
+    while (dates.length >= 3) {
+      const oldestDate = dates.shift(); // 一番古い日付を取り出す
+      // ※↑todayData を追加する前（resultの中身）のリストで計算しているため「>= 3」で判定します
+      await chrome.storage.local.remove(oldestDate);
+    }
   }
 }
 
 // 状態（現在のドメインと計測開始時間）を更新する関数
 async function setActiveState(domain) {
-  await updateTime(); // 以前のドメインの時間を精算して保存
+  await updateTime();
   
   if (domain) {
-    // 新しいドメインの計測を開始
     await chrome.storage.session.set({
       currentDomain: domain,
       startTime: Date.now()
     });
   } else {
-    // 別のアプリを見ている時などは計測をストップ
     await chrome.storage.session.set({
       currentDomain: "",
       startTime: 0
@@ -60,9 +67,6 @@ async function setActiveState(domain) {
   }
 }
 
-// -------------------------------------------------
-// 1. タブの切り替えやURL変更の検知
-// -------------------------------------------------
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await chrome.tabs.get(activeInfo.tabId);
   await setActiveState(getDomain(tab.url));
@@ -74,15 +78,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 });
 
-// -------------------------------------------------
-// 2. Chromeから別のアプリへ移動した時の検知
-// -------------------------------------------------
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    // Chromeのウィンドウからフォーカスが外れた（別のアプリを見ている）
     await setActiveState("");
   } else {
-    // Chromeにフォーカスが戻ってきた
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs.length > 0) {
       await setActiveState(getDomain(tabs[0].url));
@@ -90,15 +89,10 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   }
 });
 
-// -------------------------------------------------
-// 3. バックグラウンド停止対策（定期保存）
-// -------------------------------------------------
-// 1分ごとに現在までの時間を保存し、計測開始時間をリセットする
 chrome.alarms.create("saveTime", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "saveTime") {
     const data = await chrome.storage.session.get(["currentDomain", "startTime"]);
-    // 計測中であれば、1分間のデータを保存して再スタート
     if (data.currentDomain && data.startTime > 0) {
       await updateTime();
       await chrome.storage.session.set({ startTime: Date.now() });
