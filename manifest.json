@@ -1,12 +1,12 @@
 {
-  "manifest_version":  3,
+  "manifest_version": 3,
   "name": "ウェブタイムトラッカー",
   "version": "1.0",
-  "description": "ウェブサイトごとの閲覧時間を計測します（離席時間などを除外）。",
+  "description": "ウェブサイトごとの閲覧時間を計測します。",
   "permissions": [
     "tabs",
     "storage",
-    "idle" 
+    "alarms" 
   ],
   "background": {
     "service_worker": "background.js"
