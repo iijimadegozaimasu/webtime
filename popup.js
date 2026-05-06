@@ -2,8 +2,10 @@ document.addEventListener("DOMContentLoaded", () => {
   chrome.storage.local.get(null, (items) => {
     const list = document.getElementById("timeList");
     
-    // 時間の長い順に並び替え
-    const sortedItems = Object.entries(items).sort((a, b) => b[1] - a[1]);
+    // lastDate（日付データ）を除外し、時間の長い順に並び替え
+    const sortedItems = Object.entries(items)
+      .filter(([key]) => key !== "lastDate") // ← この行で日付データを非表示にしています
+      .sort((a, b) => b[1] - a[1]);
 
     sortedItems.forEach(([domain, timeMs]) => {
       if (!domain) return;
