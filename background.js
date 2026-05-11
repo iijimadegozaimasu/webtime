@@ -5,7 +5,7 @@ function getTodayString() {
 }
 
 // URLからドメイン名を抽出する関数
-function getDomain(url) {
+function function getDomain(url) {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname;
@@ -21,7 +21,16 @@ async function updateTime() {
   const startTime = data.startTime;
 
   if (currentDomain && startTime > 0) {
-    const timeSpent = Date.now() - startTime;
+    let timeSpent = Date.now() - startTime;
+
+    // --- 【原因B（スリープによるタイムワープ）対策】 ---
+    // 3分(180,000ミリ秒)以上経過している場合は、スリープからの復帰と判断し、
+    // ドカンと加算されないよう、1分間(60,000ミリ秒)に丸める
+    if (timeSpent > 3 * 60 * 1000) {
+      timeSpent = 60 * 1000;
+    }
+    // ----------------------------------------------------
+
     const today = getTodayString();
     
     // 現在保存されている全データを取得
@@ -36,15 +45,12 @@ async function updateTime() {
     await chrome.storage.local.set({ [today]: todayData });
 
     // --- 過去3日分だけを残す（古いデータを削除する）処理 ---
-    // 保存されているキーの中から「YYYY-MM-DD」形式のものだけを取り出して古い順に並べる
     const dates = Object.keys(result)
       .filter(key => key.match(/^\d{4}-\d{2}-\d{2}$/))
       .sort(); 
       
-    // 今日を含めて3日分（今日、1日前、2日前）を超えたら一番古いものを削除
     while (dates.length >= 3) {
-      const oldestDate = dates.shift(); // 一番古い日付を取り出す
-      // ※↑todayData を追加する前（resultの中身）のリストで計算しているため「>= 3」で判定します
+      const oldestDate = dates.shift();
       await chrome.storage.local.remove(oldestDate);
     }
   }
